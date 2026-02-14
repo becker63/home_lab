@@ -1,0 +1,1201 @@
+This file is a merged representation of the entire codebase, combined into a single document by Repomix.
+
+<file_summary>
+This section contains a summary of this file.
+
+<purpose>
+This file contains a packed representation of the entire repository's contents.
+It is designed to be easily consumable by AI systems for analysis, code review,
+or other automated processes.
+</purpose>
+
+<file_format>
+The content is organized as follows:
+1. This summary section
+2. Repository information
+3. Directory structure
+4. Repository files (if enabled)
+5. Multiple file entries, each consisting of:
+  - File path as an attribute
+  - Full contents of the file
+</file_format>
+
+<usage_guidelines>
+- This file should be treated as read-only. Any changes should be made to the
+  original repository files, not this packed version.
+- When processing this file, use the file path to distinguish
+  between different files in the repository.
+- Be aware that this file may contain sensitive information. Handle it with
+  the same level of security as you would the original repository.
+</usage_guidelines>
+
+<notes>
+- Some files may have been excluded based on .gitignore rules and Repomix's configuration
+- Binary files are not included in this packed representation. Please refer to the Repository Structure section for a complete list of file paths, including binary files
+- Files matching patterns in .gitignore are excluded
+- Files matching default ignore patterns are excluded
+- Files are sorted by Git change count (files with more changes are at the bottom)
+</notes>
+
+</file_summary>
+
+<directory_structure>
+hosts/
+  basic/
+    configuration.nix
+  gaming/
+    configuration.nix
+  gateway/
+    configuration.nix
+  nix-builder/
+    configuration.nix
+    hardware-configuration.nix
+modules/
+  disk-config.nix
+  dont-sleep.nix
+  nix-settings.nix
+  serial.nix
+.gitignore
+flake.lock
+flake.nix
+installer-image.nix
+justfile
+</directory_structure>
+
+<files>
+This section contains the contents of the repository's files.
+
+<file path="hosts/basic/configuration.nix">
+{
+  modulesPath,
+  lib,
+  pkgs,
+  ...
+}@args:
+{
+  imports = [
+    (modulesPath + "/installer/scan/not-detected.nix")
+    (modulesPath + "/profiles/qemu-guest.nix")
+    ../../modules/disk-config.nix
+    ../../modules/nix-settings.nix
+    ../../modules/serial.nix
+  ];
+  boot.loader.grub = {
+    # no need to set devices, disko will add all devices that have a EF02 partition to the list already
+    # devices = [ ];
+    efiSupport = true;
+    efiInstallAsRemovable = true;
+  };
+  services.openssh.enable = true;
+  services.openssh.settings.PermitRootLogin = "yes";
+
+  environment.systemPackages = with pkgs; [
+    pciutils
+  ];
+
+  system.stateVersion = "24.05";
+}
+</file>
+
+<file path="hosts/gaming/configuration.nix">
+{
+  modulesPath,
+  lib,
+  pkgs,
+  ...
+}@args:
+{
+  imports = [
+    (modulesPath + "/installer/scan/not-detected.nix")
+    (modulesPath + "/profiles/qemu-guest.nix")
+    ../../modules/disk-config.nix
+    ../../modules/nix-settings.nix
+    ../../modules/serial.nix
+    ../../modules/dont-sleep.nix
+  ];
+
+  boot.kernelParams = [
+    "i915.enable_guc=3"
+    "i915.force_probe=56a6"
+    "i915.enable_dc=0"
+    "i915.enable_psr=0"
+  ];
+
+  boot.kernelPackages = pkgs.linuxPackages_cachyos;
+  boot.kernel.sysctl = {
+    "kernel.split_lock_mitigate" = 0;
+    "kernel.nmi_watchdog" = 0;
+    "kernel.sched_bore" = "1";
+  };
+
+  services.sunshine = {
+    enable = true;
+    autoStart = true;
+    capSysAdmin = true;
+    openFirewall = true;
+  };
+
+  # BOOT
+  boot.loader.grub = {
+    efiSupport = true;
+    efiInstallAsRemovable = true;
+  };
+
+  # SSH
+  services.openssh.enable = true;
+  services.openssh.settings.PermitRootLogin = "yes";
+
+  # NETWORK
+  networking.networkmanager.enable = true;
+
+  # INTEL ARC GPU SUPPORT
+  services.xserver.videoDrivers = [ "modesetting" ];
+
+  hardware.graphics = {
+    enable = true;
+    extraPackages = with pkgs; [
+      intel-media-driver
+      libva-vdpau-driver
+      libvdpau-va-gl
+    ];
+  };
+
+  environment.variables = {
+    LIBVA_DRIVER_NAME = "iHD";
+  };
+
+  ############################
+  # STEAMOS (JOVIAN)
+  ############################
+
+  jovian = {
+    steam.enable = true;
+    steam.autoStart = true;
+    steam.user = "steamos";
+    steamos.useSteamOSConfig = true;
+    hardware.has.amd.gpu = false;
+    steam.desktopSession = "gamescope-wayland";
+  };
+
+  ############################
+  # REQUIRED SYSTEM SERVICES
+  ############################
+
+  services.seatd.enable = true;
+
+  services.pipewire = {
+    enable = true;
+    pulse.enable = true;
+    alsa.enable = true;
+  };
+
+  ############################
+  # USERS
+  ############################
+
+  users.users.steamos = {
+    isNormalUser = true;
+    description = "SteamOS";
+    extraGroups = [
+      "video"
+      "audio"
+      "seat"
+      "networkmanager"
+      "input"
+    ];
+    password = "steamos";
+  };
+
+  ############################
+  # TOOLS
+  ############################
+
+  environment.systemPackages = with pkgs; [
+    pciutils
+    mesa
+    vulkan-tools
+    intel-gpu-tools
+  ];
+
+  system.stateVersion = "24.05";
+}
+</file>
+
+<file path="hosts/gateway/configuration.nix">
+{
+  modulesPath,
+  lib,
+  pkgs,
+  ...
+}@args:
+{
+  imports = [
+    (modulesPath + "/installer/scan/not-detected.nix")
+    (modulesPath + "/profiles/qemu-guest.nix")
+    ../../modules/disk-config.nix
+    ../../modules/nix-settings.nix
+    ../../modules/serial.nix
+  ];
+
+  boot.loader.grub = {
+    efiSupport = true;
+    efiInstallAsRemovable = true;
+  };
+
+  networking.hostName = "tailscale-gateway";
+  networking.networkmanager.enable = true;
+
+  services.openssh.enable = true;
+  services.openssh.settings.PermitRootLogin = "yes";
+
+  boot.kernel.sysctl = {
+    "net.ipv4.ip_forward" = 1;
+    "net.ipv6.conf.all.forwarding" = 1;
+  };
+
+  networking.nat = {
+    enable = true;
+    externalInterface = "ens18"; # Proxmox default bridge NIC
+    internalInterfaces = [ "tailscale0" ];
+  };
+
+  services.tailscale = {
+    enable = true;
+    openFirewall = true;
+    useRoutingFeatures = "both";
+    authKeyFile = "/etc/tailscale-authkey";
+    extraUpFlags = [
+      "--advertise-routes=192.168.0.0/24"
+    ];
+  };
+
+  environment.systemPackages = with pkgs; [
+    pciutils
+    tailscale
+  ];
+
+  system.stateVersion = "24.05";
+}
+</file>
+
+<file path="hosts/nix-builder/configuration.nix">
+{ config, pkgs, ... }:
+{
+  boot.loader.grub = {
+    enable = true;
+    devices = [ "/dev/sda" ];
+  };
+
+  networking.hostName = "nix-builder";
+
+  services.openssh.enable = true;
+
+  users.users.root.openssh.authorizedKeys.keys = [
+    "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIKOLf+qV/gwORnv7FGIusYHWHHlofZLkwTuUmfU3aWyp colmena-laptop"
+  ];
+
+  nix = {
+    settings = {
+      experimental-features = [
+        "nix-command"
+        "flakes"
+      ];
+
+      trusted-users = [ "root" ];
+      max-jobs = "auto";
+      cores = 0;
+
+      # THIS enables 32bit builds
+      extra-platforms = [ "i686-linux" ];
+
+      system-features = [
+        "kvm"
+        "big-parallel"
+        "nixos-test"
+      ];
+    };
+
+    buildMachines = [
+      {
+        hostName = "nix-builder";
+        system = "x86_64-linux";
+        sshUser = "root";
+        sshKey = "/root/.ssh/authorized_keys";
+        maxJobs = 16;
+        speedFactor = 2;
+
+        supportedFeatures = [
+          "kvm"
+          "big-parallel"
+          "nixos-test"
+        ];
+      }
+    ];
+
+    distributedBuilds = true;
+  };
+
+  services.nix-serve = {
+    enable = true;
+    port = 5000;
+    secretKeyFile = "/etc/nix/cache-priv-key.pem";
+  };
+
+  networking.firewall.allowedTCPPorts = [
+    22
+    5000
+  ];
+
+  environment.systemPackages = with pkgs; [
+    git
+    htop
+    curl
+  ];
+
+  system.stateVersion = "25.05";
+}
+</file>
+
+<file path="hosts/nix-builder/hardware-configuration.nix">
+# Do not modify this file!  It was generated by ‘nixos-generate-config’
+# and may be overwritten by future invocations.  Please make changes
+# to /etc/nixos/configuration.nix instead.
+{ config, lib, pkgs, modulesPath, ... }:
+
+{
+  imports =
+    [ (modulesPath + "/profiles/qemu-guest.nix")
+    ];
+
+  boot.initrd.availableKernelModules = [ "ata_piix" "uhci_hcd" "virtio_pci" "virtio_scsi" "sd_mod" "sr_mod" ];
+  boot.initrd.kernelModules = [ ];
+  boot.kernelModules = [ "kvm-amd" ];
+  boot.extraModulePackages = [ ];
+
+  fileSystems."/" =
+    { device = "/dev/disk/by-uuid/36b34dd7-827d-4c24-be66-d16fa67a4b5b";
+      fsType = "ext4";
+    };
+
+  swapDevices =
+    [ { device = "/dev/disk/by-uuid/3e66cd17-bba0-48d2-bb2e-00ca324be16c"; }
+    ];
+
+  # Enables DHCP on each ethernet and wireless interface. In case of scripted networking
+  # (the default) this is the recommended approach. When using systemd-networkd it's
+  # still possible to use this option, but it's recommended to use it in conjunction
+  # with explicit per-interface declarations with `networking.interfaces.<interface>.useDHCP`.
+  networking.useDHCP = lib.mkDefault true;
+  # networking.interfaces.ens18.useDHCP = lib.mkDefault true;
+
+  nixpkgs.hostPlatform = lib.mkDefault "x86_64-linux";
+}
+</file>
+
+<file path="modules/disk-config.nix">
+{ lib, ... }:
+{
+  disko.devices = {
+    disk.disk1 = {
+      device = lib.mkDefault "/dev/sda";
+      type = "disk";
+      content = {
+        type = "gpt";
+        partitions = {
+          boot = {
+            name = "boot";
+            size = "1M";
+            type = "EF02";
+          };
+          esp = {
+            name = "ESP";
+            size = "500M";
+            type = "EF00";
+            content = {
+              type = "filesystem";
+              format = "vfat";
+              mountpoint = "/boot";
+            };
+          };
+          root = {
+            name = "root";
+            size = "100%";
+            content = {
+              type = "lvm_pv";
+              vg = "pool";
+            };
+          };
+        };
+      };
+    };
+    lvm_vg = {
+      pool = {
+        type = "lvm_vg";
+        lvs = {
+          root = {
+            size = "100%FREE";
+            content = {
+              type = "filesystem";
+              format = "ext4";
+              mountpoint = "/";
+              mountOptions = [
+                "defaults"
+              ];
+            };
+          };
+        };
+      };
+    };
+  };
+}
+</file>
+
+<file path="modules/dont-sleep.nix">
+{
+  config,
+  pkgs,
+  lib,
+  ...
+}:
+
+{
+
+  systemd.targets.sleep.enable = lib.mkForce false;
+  systemd.targets.suspend.enable = lib.mkForce false;
+  systemd.targets.hibernate.enable = lib.mkForce false;
+  systemd.targets.hybrid-sleep.enable = lib.mkForce false;
+
+  boot.kernelParams = lib.mkAfter [
+    "intel_idle.max_cstate=0"
+    "processor.max_cstate=1"
+    "idle=nomwait"
+  ];
+
+  systemd.services.no-sleep = {
+    enable = true;
+    description = "Prevent system sleep for gaming server";
+    wantedBy = [ "multi-user.target" ];
+    serviceConfig = {
+      Type = "simple";
+      ExecStart = ''
+        ${pkgs.systemd}/bin/systemd-inhibit \
+          --what=sleep:idle:handle-lid-switch \
+          --who="gaming-server" \
+          --why="Always-on Sunshine + Steam VM" \
+          ${pkgs.coreutils}/bin/sleep infinity
+      '';
+      Restart = "always";
+    };
+  };
+
+  powerManagement.cpuFreqGovernor = lib.mkDefault "performance";
+}
+</file>
+
+<file path="modules/nix-settings.nix">
+{ config, lib, ... }:
+
+{
+  nixpkgs.config.allowUnfree = lib.mkDefault true;
+
+  nix = {
+    distributedBuilds = true;
+
+    buildMachines = [
+      {
+        hostName = "192.168.0.102";
+        sshUser = "root";
+        system = "x86_64-linux";
+        maxJobs = 16;
+        speedFactor = 2;
+        supportedFeatures = [
+          "kvm"
+          "big-parallel"
+          "nixos-test"
+        ];
+      }
+    ];
+
+    settings = lib.mkMerge [
+      {
+        substituters = [ "http://192.168.0.102:5000" ];
+        trusted-public-keys = [
+          "nix-builder:vBW54yytRLJ2RSQDtIT5wExXfSMzzmnLTk+sMyeTAfg="
+        ];
+        builders-use-substitutes = true;
+      }
+
+      {
+        experimental-features = [
+          "nix-command"
+          "flakes"
+        ];
+      }
+    ];
+  };
+
+  users.users.root.initialPassword = "jidw";
+  users.users.root.openssh.authorizedKeys.keys = [
+    "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIKOLf+qV/gwORnv7FGIusYHWHHlofZLkwTuUmfU3aWyp colmena-laptop"
+  ];
+}
+</file>
+
+<file path="modules/serial.nix">
+{
+  config,
+  pkgs,
+  lib,
+  ...
+}:
+
+{
+  boot.kernelParams = lib.mkAfter [
+    "console=ttyS0,115200n8"
+    "console=tty0"
+    "earlycon=uart,io,0x3f8,115200"
+    "loglevel=7"
+    "systemd.log_target=console"
+    "systemd.log_level=debug"
+  ];
+
+  boot.initrd.verbose = lib.mkDefault true;
+  boot.plymouth.enable = lib.mkDefault false;
+
+  systemd.services."serial-getty@ttyS0" = {
+    enable = true;
+    wantedBy = [ "getty.target" ];
+    serviceConfig.ExecStart = lib.mkForce "${pkgs.systemd}/bin/agetty --autologin root ttyS0 115200";
+  };
+}
+</file>
+
+<file path=".gitignore">
+.direnv/
+</file>
+
+<file path="flake.lock">
+{
+  "nodes": {
+    "chaotic": {
+      "inputs": {
+        "flake-schemas": "flake-schemas",
+        "home-manager": "home-manager",
+        "jovian": "jovian",
+        "nixpkgs": "nixpkgs",
+        "rust-overlay": "rust-overlay"
+      },
+      "locked": {
+        "lastModified": 1763732117,
+        "narHash": "sha256-/zBu6slgHtkuFZFJ4ReKS3NO6rdwEv4KcaYADkz6KyA=",
+        "owner": "chaotic-cx",
+        "repo": "nyx",
+        "rev": "a34640558e83eb3ba0d52c52cb5ffd0465786e4b",
+        "type": "github"
+      },
+      "original": {
+        "owner": "chaotic-cx",
+        "ref": "nyxpkgs-unstable",
+        "repo": "nyx",
+        "type": "github"
+      }
+    },
+    "colmena": {
+      "inputs": {
+        "flake-compat": "flake-compat",
+        "flake-utils": "flake-utils",
+        "nix-github-actions": "nix-github-actions_2",
+        "nixpkgs": "nixpkgs_2",
+        "stable": "stable"
+      },
+      "locked": {
+        "lastModified": 1762034856,
+        "narHash": "sha256-QVey3iP3UEoiFVXgypyjTvCrsIlA4ecx6Acaz5C8/PQ=",
+        "owner": "zhaofengli",
+        "repo": "colmena",
+        "rev": "349b035a5027f23d88eeb3bc41085d7ee29f18ed",
+        "type": "github"
+      },
+      "original": {
+        "owner": "zhaofengli",
+        "repo": "colmena",
+        "type": "github"
+      }
+    },
+    "disko": {
+      "inputs": {
+        "nixpkgs": "nixpkgs_3"
+      },
+      "locked": {
+        "lastModified": 1763651264,
+        "narHash": "sha256-8vvwZbw0s7YvBMJeyPVpWke6lg6ROgtts5N2/SMCcv4=",
+        "owner": "nix-community",
+        "repo": "disko",
+        "rev": "e86a89079587497174ccab6d0d142a65811a4fd9",
+        "type": "github"
+      },
+      "original": {
+        "owner": "nix-community",
+        "repo": "disko",
+        "type": "github"
+      }
+    },
+    "flake-compat": {
+      "flake": false,
+      "locked": {
+        "lastModified": 1650374568,
+        "narHash": "sha256-Z+s0J8/r907g149rllvwhb4pKi8Wam5ij0st8PwAh+E=",
+        "owner": "edolstra",
+        "repo": "flake-compat",
+        "rev": "b4a34015c698c7793d592d66adbab377907a2be8",
+        "type": "github"
+      },
+      "original": {
+        "owner": "edolstra",
+        "repo": "flake-compat",
+        "type": "github"
+      }
+    },
+    "flake-schemas": {
+      "locked": {
+        "lastModified": 1721999734,
+        "narHash": "sha256-G5CxYeJVm4lcEtaO87LKzOsVnWeTcHGKbKxNamNWgOw=",
+        "rev": "0a5c42297d870156d9c57d8f99e476b738dcd982",
+        "revCount": 75,
+        "type": "tarball",
+        "url": "https://api.flakehub.com/f/pinned/DeterminateSystems/flake-schemas/0.1.5/0190ef2f-61e0-794b-ba14-e82f225e55e6/source.tar.gz"
+      },
+      "original": {
+        "type": "tarball",
+        "url": "https://flakehub.com/f/DeterminateSystems/flake-schemas/%3D0.1.5.tar.gz"
+      }
+    },
+    "flake-utils": {
+      "locked": {
+        "lastModified": 1659877975,
+        "narHash": "sha256-zllb8aq3YO3h8B/U0/J1WBgAL8EX5yWf5pMj3G0NAmc=",
+        "owner": "numtide",
+        "repo": "flake-utils",
+        "rev": "c0e246b9b83f637f4681389ecabcb2681b4f3af0",
+        "type": "github"
+      },
+      "original": {
+        "owner": "numtide",
+        "repo": "flake-utils",
+        "type": "github"
+      }
+    },
+    "flake-utils_2": {
+      "inputs": {
+        "systems": "systems"
+      },
+      "locked": {
+        "lastModified": 1731533236,
+        "narHash": "sha256-l0KFg5HjrsfsO/JpG+r7fRrqm12kzFHyUHqHCVpMMbI=",
+        "owner": "numtide",
+        "repo": "flake-utils",
+        "rev": "11707dc2f618dd54ca8739b309ec4fc024de578b",
+        "type": "github"
+      },
+      "original": {
+        "owner": "numtide",
+        "repo": "flake-utils",
+        "type": "github"
+      }
+    },
+    "home-manager": {
+      "inputs": {
+        "nixpkgs": [
+          "chaotic",
+          "nixpkgs"
+        ]
+      },
+      "locked": {
+        "lastModified": 1763416652,
+        "narHash": "sha256-8EBEEvtzQ11LCxpQHMNEBQAGtQiCu/pqP9zSovDSbNM=",
+        "owner": "nix-community",
+        "repo": "home-manager",
+        "rev": "ea164b7c9ccdc2321379c2ff78fd4317b4c41312",
+        "type": "github"
+      },
+      "original": {
+        "owner": "nix-community",
+        "repo": "home-manager",
+        "type": "github"
+      }
+    },
+    "jovian": {
+      "inputs": {
+        "nix-github-actions": "nix-github-actions",
+        "nixpkgs": [
+          "chaotic",
+          "nixpkgs"
+        ]
+      },
+      "locked": {
+        "lastModified": 1763453666,
+        "narHash": "sha256-Hu8lDUlbMFvcYX30LBXX7Gq5FbU35bERH0pSX5qHf/Q=",
+        "owner": "Jovian-Experiments",
+        "repo": "Jovian-NixOS",
+        "rev": "b843b551415c7aecc97c8b3ab3fff26fd0cd8bbf",
+        "type": "github"
+      },
+      "original": {
+        "owner": "Jovian-Experiments",
+        "repo": "Jovian-NixOS",
+        "type": "github"
+      }
+    },
+    "jovian_2": {
+      "inputs": {
+        "nix-github-actions": "nix-github-actions_3",
+        "nixpkgs": [
+          "nixpkgs"
+        ]
+      },
+      "locked": {
+        "lastModified": 1763714684,
+        "narHash": "sha256-ZNJPAaeSYQTDgvwwE8XHhCz4HiHqYoUyoXdoBE2nxug=",
+        "owner": "Jovian-Experiments",
+        "repo": "Jovian-NixOS",
+        "rev": "6178d787ee61b8586fdb0ccb8644fbfd5317d0f3",
+        "type": "github"
+      },
+      "original": {
+        "owner": "Jovian-Experiments",
+        "repo": "Jovian-NixOS",
+        "type": "github"
+      }
+    },
+    "nix-github-actions": {
+      "inputs": {
+        "nixpkgs": [
+          "chaotic",
+          "jovian",
+          "nixpkgs"
+        ]
+      },
+      "locked": {
+        "lastModified": 1729697500,
+        "narHash": "sha256-VFTWrbzDlZyFHHb1AlKRiD/qqCJIripXKiCSFS8fAOY=",
+        "owner": "zhaofengli",
+        "repo": "nix-github-actions",
+        "rev": "e418aeb728b6aa5ca8c5c71974e7159c2df1d8cf",
+        "type": "github"
+      },
+      "original": {
+        "owner": "zhaofengli",
+        "ref": "matrix-name",
+        "repo": "nix-github-actions",
+        "type": "github"
+      }
+    },
+    "nix-github-actions_2": {
+      "inputs": {
+        "nixpkgs": [
+          "colmena",
+          "nixpkgs"
+        ]
+      },
+      "locked": {
+        "lastModified": 1729742964,
+        "narHash": "sha256-B4mzTcQ0FZHdpeWcpDYPERtyjJd/NIuaQ9+BV1h+MpA=",
+        "owner": "nix-community",
+        "repo": "nix-github-actions",
+        "rev": "e04df33f62cdcf93d73e9a04142464753a16db67",
+        "type": "github"
+      },
+      "original": {
+        "owner": "nix-community",
+        "repo": "nix-github-actions",
+        "type": "github"
+      }
+    },
+    "nix-github-actions_3": {
+      "inputs": {
+        "nixpkgs": [
+          "jovian",
+          "nixpkgs"
+        ]
+      },
+      "locked": {
+        "lastModified": 1729697500,
+        "narHash": "sha256-VFTWrbzDlZyFHHb1AlKRiD/qqCJIripXKiCSFS8fAOY=",
+        "owner": "zhaofengli",
+        "repo": "nix-github-actions",
+        "rev": "e418aeb728b6aa5ca8c5c71974e7159c2df1d8cf",
+        "type": "github"
+      },
+      "original": {
+        "owner": "zhaofengli",
+        "ref": "matrix-name",
+        "repo": "nix-github-actions",
+        "type": "github"
+      }
+    },
+    "nixlib": {
+      "locked": {
+        "lastModified": 1736643958,
+        "narHash": "sha256-tmpqTSWVRJVhpvfSN9KXBvKEXplrwKnSZNAoNPf/S/s=",
+        "owner": "nix-community",
+        "repo": "nixpkgs.lib",
+        "rev": "1418bc28a52126761c02dd3d89b2d8ca0f521181",
+        "type": "github"
+      },
+      "original": {
+        "owner": "nix-community",
+        "repo": "nixpkgs.lib",
+        "type": "github"
+      }
+    },
+    "nixos-generators": {
+      "inputs": {
+        "nixlib": "nixlib",
+        "nixpkgs": [
+          "nixpkgs"
+        ]
+      },
+      "locked": {
+        "lastModified": 1751903740,
+        "narHash": "sha256-PeSkNMvkpEvts+9DjFiop1iT2JuBpyknmBUs0Un0a4I=",
+        "owner": "nix-community",
+        "repo": "nixos-generators",
+        "rev": "032decf9db65efed428afd2fa39d80f7089085eb",
+        "type": "github"
+      },
+      "original": {
+        "owner": "nix-community",
+        "repo": "nixos-generators",
+        "type": "github"
+      }
+    },
+    "nixpkgs": {
+      "locked": {
+        "lastModified": 1763421233,
+        "narHash": "sha256-Stk9ZYRkGrnnpyJ4eqt9eQtdFWRRIvMxpNRf4sIegnw=",
+        "owner": "NixOS",
+        "repo": "nixpkgs",
+        "rev": "89c2b2330e733d6cdb5eae7b899326930c2c0648",
+        "type": "github"
+      },
+      "original": {
+        "owner": "NixOS",
+        "ref": "nixos-unstable",
+        "repo": "nixpkgs",
+        "type": "github"
+      }
+    },
+    "nixpkgs_2": {
+      "locked": {
+        "lastModified": 1750134718,
+        "narHash": "sha256-v263g4GbxXv87hMXMCpjkIxd/viIF7p3JpJrwgKdNiI=",
+        "owner": "NixOS",
+        "repo": "nixpkgs",
+        "rev": "9e83b64f727c88a7711a2c463a7b16eedb69a84c",
+        "type": "github"
+      },
+      "original": {
+        "owner": "NixOS",
+        "ref": "nixos-unstable",
+        "repo": "nixpkgs",
+        "type": "github"
+      }
+    },
+    "nixpkgs_3": {
+      "locked": {
+        "lastModified": 1752596105,
+        "narHash": "sha256-lFNVsu/mHLq3q11MuGkMhUUoSXEdQjCHvpReaGP1S2k=",
+        "owner": "NixOS",
+        "repo": "nixpkgs",
+        "rev": "dab3a6e781554f965bde3def0aa2fda4eb8f1708",
+        "type": "github"
+      },
+      "original": {
+        "owner": "NixOS",
+        "ref": "nixpkgs-unstable",
+        "repo": "nixpkgs",
+        "type": "github"
+      }
+    },
+    "nixpkgs_4": {
+      "locked": {
+        "lastModified": 1763835633,
+        "narHash": "sha256-HzxeGVID5MChuCPESuC0dlQL1/scDKu+MmzoVBJxulM=",
+        "owner": "NixOS",
+        "repo": "nixpkgs",
+        "rev": "050e09e091117c3d7328c7b2b7b577492c43c134",
+        "type": "github"
+      },
+      "original": {
+        "owner": "NixOS",
+        "ref": "nixos-unstable",
+        "repo": "nixpkgs",
+        "type": "github"
+      }
+    },
+    "root": {
+      "inputs": {
+        "chaotic": "chaotic",
+        "colmena": "colmena",
+        "disko": "disko",
+        "flake-utils": "flake-utils_2",
+        "jovian": "jovian_2",
+        "nixos-generators": "nixos-generators",
+        "nixpkgs": "nixpkgs_4"
+      }
+    },
+    "rust-overlay": {
+      "inputs": {
+        "nixpkgs": [
+          "chaotic",
+          "nixpkgs"
+        ]
+      },
+      "locked": {
+        "lastModified": 1763433504,
+        "narHash": "sha256-cVid5UNpk88sPYHkLAA5aZEHOFQXSB/2L1vl18Aq7IM=",
+        "owner": "oxalica",
+        "repo": "rust-overlay",
+        "rev": "42ce16c6d8318a654d53f047c9400b7d902d6e61",
+        "type": "github"
+      },
+      "original": {
+        "owner": "oxalica",
+        "repo": "rust-overlay",
+        "type": "github"
+      }
+    },
+    "stable": {
+      "locked": {
+        "lastModified": 1750133334,
+        "narHash": "sha256-urV51uWH7fVnhIvsZIELIYalMYsyr2FCalvlRTzqWRw=",
+        "owner": "NixOS",
+        "repo": "nixpkgs",
+        "rev": "36ab78dab7da2e4e27911007033713bab534187b",
+        "type": "github"
+      },
+      "original": {
+        "owner": "NixOS",
+        "ref": "nixos-25.05",
+        "repo": "nixpkgs",
+        "type": "github"
+      }
+    },
+    "systems": {
+      "locked": {
+        "lastModified": 1681028828,
+        "narHash": "sha256-Vy1rq5AaRuLzOxct8nz4T6wlgyUR7zLU309k9mBC768=",
+        "owner": "nix-systems",
+        "repo": "default",
+        "rev": "da67096a3b9bf56a91d16901293e51ba5b49a27e",
+        "type": "github"
+      },
+      "original": {
+        "owner": "nix-systems",
+        "repo": "default",
+        "type": "github"
+      }
+    }
+  },
+  "root": "root",
+  "version": 7
+}
+</file>
+
+<file path="flake.nix">
+{
+  description = "Home lab - Colmena controlled NixOS builder + Gaming VM";
+
+  inputs = {
+    nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
+    colmena.url = "github:zhaofengli/colmena";
+    flake-utils.url = "github:numtide/flake-utils";
+
+    # nixos-anywhere + disk automation
+    disko.url = "github:nix-community/disko";
+
+    # Gaming stack
+    chaotic.url = "github:chaotic-cx/nyx/nyxpkgs-unstable";
+
+    jovian = {
+      url = "github:Jovian-Experiments/Jovian-NixOS";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
+
+    nixos-generators = {
+      url = "github:nix-community/nixos-generators";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
+  };
+
+  outputs =
+    {
+      self,
+      nixpkgs,
+      colmena,
+      flake-utils,
+      disko,
+      chaotic,
+      jovian,
+      nixos-generators,
+      ...
+    }:
+    let
+      system = "x86_64-linux";
+
+      gamingModules = [
+        disko.nixosModules.disko
+        chaotic.nixosModules.default
+        jovian.nixosModules.default
+        ./hosts/gaming/configuration.nix
+      ];
+    in
+    {
+      packages.${system}.installer-iso = nixos-generators.nixosGenerate {
+        system = system;
+        format = "iso";
+        modules = [
+          ./installer-image.nix
+        ];
+      };
+
+      nixosConfigurations = {
+        gaming = nixpkgs.lib.nixosSystem {
+          system = system;
+          modules = gamingModules;
+        };
+
+        gateway = nixpkgs.lib.nixosSystem {
+          system = system;
+          modules = [
+            disko.nixosModules.disko
+            ./hosts/gateway/configuration.nix
+          ];
+        };
+      };
+
+      colmenaHive = colmena.lib.makeHive {
+        meta = {
+          nixpkgs = import nixpkgs {
+            system = system;
+            overlays = [ ];
+          };
+        };
+
+        gaming =
+          { pkgs, ... }:
+          {
+            deployment = {
+              targetHost = "192.168.0.197";
+              targetUser = "root";
+              sshOptions = [
+                "-i"
+                "/home/becker/.ssh/colmena"
+              ];
+            };
+
+            imports = gamingModules;
+          };
+
+        gateway =
+          { pkgs, ... }:
+          {
+            deployment = {
+              targetHost = "192.168.0.132";
+              targetUser = "root";
+              sshOptions = [
+                "-i"
+                "/home/becker/.ssh/colmena"
+              ];
+            };
+
+            imports = [
+              disko.nixosModules.disko
+              ./hosts/gateway/configuration.nix
+            ];
+          };
+
+        # --- Builder node ---
+        builder =
+          {
+            name,
+            nodes,
+            pkgs,
+            ...
+          }:
+          {
+            deployment = {
+              targetHost = "192.168.0.102";
+              targetUser = "root";
+              buildOnTarget = true;
+              sshOptions = [
+                "-i"
+                "/home/becker/.ssh/colmena"
+              ];
+            };
+
+            imports = [
+              ./hosts/nix-builder/configuration.nix
+              ./hosts/nix-builder/hardware-configuration.nix
+            ];
+          };
+      };
+    }
+    // flake-utils.lib.eachDefaultSystem (
+      system:
+      let
+        pkgs = nixpkgs.legacyPackages.${system};
+      in
+      {
+        devShells.default = pkgs.mkShell {
+          buildInputs = [
+            colmena.packages.${system}.colmena
+            pkgs.just
+          ];
+        };
+      }
+    );
+}
+</file>
+
+<file path="installer-image.nix">
+{ pkgs, modulesPath, ... }:
+
+{
+  imports = [
+    (modulesPath + "/installer/cd-dvd/installation-cd-minimal.nix")
+    ./modules/nix-settings.nix
+    ./modules/serial.nix
+  ];
+
+  services.openssh = {
+    enable = true;
+    settings = {
+      PermitRootLogin = "yes";
+      PasswordAuthentication = true;
+    };
+  };
+
+  users.users.root = {
+    initialPassword = pkgs.lib.mkForce "jidw";
+    initialHashedPassword = pkgs.lib.mkForce null;
+  };
+
+  networking.firewall.allowedTCPPorts = [ 22 ];
+
+  environment.systemPackages = with pkgs; [
+    git
+    curl
+    just
+  ];
+
+  system.stateVersion = "23.11";
+}
+</file>
+
+<file path="justfile">
+deploy:
+    nix run github:nix-community/nixos-anywhere -- --build-on local --flake .#gateway root@192.168.0.132
+</file>
+
+</files>
